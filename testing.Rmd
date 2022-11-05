@@ -1,0 +1,902 @@
+---
+title: "Shiny_Wrangle"
+author: "Flynn McMorrow"
+date: "7/20/2021"
+output: html_document
+---
+
+#Library and Working Directory
+```{r}
+library(shiny)
+library(DT)
+library(shinydashboard)
+library(magrittr)
+library(tidyverse)
+library(dplyr)
+library(naniar)
+library(stringr)
+library(gtsummary)
+library(gt)
+library(cowplot)
+library(colourpicker)
+library(stringr)
+library(ggmosaic)
+library(shinyvalidate)
+library(ggpubr)
+library(ggrepel)
+library(forcats)
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+```
+
+#Primary Groups
+```{r}
+display_type <- c("Count", "Percent")
+
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+
+missing_data <- c("Yes", "No")
+
+caption <- c("No", "Yes")
+
+dataset_choice <- c("MAPP I Baseline", "Mapp II Baseline")
+```
+
+#MAPP BL 2
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_bl_2 <- read.csv("mapp_bl_2.csv") %>%
+  mutate(cohorttype2 = ifelse(cohorttype == 1, "1 - UCPPS", ifelse(cohorttype == 2, "2 - Healthy Controls", "3 - Positive Controls")), sex = ifelse(sex == 1, "Male", "Female")) %>% 
+  select(-pid)
+
+mapp_bl_cohort <- mapp_bl_2 %>% 
+  select(cohorttype2) %>% 
+  distinct(cohorttype2, .keep_all = TRUE)
+
+mapp_bl_sex <- mapp_bl_2 %>% 
+  select(sex) %>% 
+  distinct(sex, .keep_all = TRUE)
+
+mapp_bl_primary <- variable_assignments_3 %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#Variable Assignment 3
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_dict <- read.csv("variable_dict.csv")
+
+variable_assignments_3 <- mapp_dict %>% 
+  slice(1:910) %>% 
+  mutate(variable = as.character(NAME), variable_selection = as.character(Primary_Grouping), label = as.character(LABEL)) %>% 
+  mutate(ANALYSIS_TYPE_2 = ifelse(ANALYSIS_TYPE == 1, "1 - Continuous", ifelse(ANALYSIS_TYPE == 2, "2 - Ordinal", ifelse(ANALYSIS_TYPE == 3, "3 - Nominal", "4 - Binary")))) %>% 
+  select(variable, variable_selection, ANALYSIS_TYPE, ANALYSIS_TYPE_2, label) %>% 
+  filter(variable != "pid" & variable != "zip_first3")
+```
+
+#MAPP Labels
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+
+mapp_bl_labels <- read.csv("mapp_bl_label.csv") %>% 
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")),  
+         sex = ifelse(sex == "1: Male", "Male", "Female"), bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat)) %>% 
+  select(-pid)
+mapp_bl_labels[mapp_bl_labels == "."] <- NA
+
+variable_assignments_4 <- variable_assignments_3 %>% 
+  filter(ANALYSIS_TYPE != 1 & variable != "pid")
+
+variable_assignments_5 <- variable_assignments_3 %>% 
+  filter(ANALYSIS_TYPE == 1 & variable != "pid")
+
+factored <- mapp_bl_labels %>% 
+  select(any_of(variable_assignments_4$variable)) %>% 
+  mutate_if(is.numeric, as.factor)
+
+continuous <- mapp_bl_2 %>% 
+  select(any_of(variable_assignments_5$variable))
+
+mapp_bl_combined <- data.frame(factored, continuous) %>% 
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")), 
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat))
+```
+
+#Labels and Levels
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+full_labels <- read_csv("full_labels.csv") %>% 
+  drop_na()
+
+factored %>% 
+  summarise_all(n_distinct) %>% 
+  gather(key = "variable", value = "n") %>% 
+  filter(n > 6) %>% 
+  arrange(desc(n))
+```
+
+#Testing drop_na
+```{r}
+mapp_bl_combined %>% 
+  filter(cohorttype2 == "1 - UCPPS") %>% 
+  select(age_dx_pbsic)
+```
+
+#bpi_numsites_pp
+```{r}
+unique(variable_assignments_3$ANALYSIS_TYPE_2)
+
+variable_assignments_3 %>% 
+  filter(variable == "bpi_numsites_pp")
+
+variable_assignments_3 %>% 
+  group_by(variable) %>%
+  filter(n()>1) %>% 
+  arrange(variable)
+
+variable_assignments_3 %>% 
+  group_by(variable) %>%
+  filter(n()>1) %>% 
+  arrange(variable) %>% 
+  distinct(variable, .keep_all = TRUE)
+
+variable_assignments_4 %>% 
+  group_by(variable) %>%
+  filter(n()>1) %>% 
+  arrange(variable)
+```
+
+
+#Max/Min
+```{r}
+max(mapp_bl_2$pain_severity, na.rm = TRUE)
+max(mapp_bl_2$urinary_severity, na.rm = TRUE)
+
+qwerty <- mapp_bl_2 %>% 
+  select(pain_severity)
+
+max(qwerty, na.rm = TRUE)
+min(qwerty, na.rm = TRUE)
+```
+
+#pain_severity Scaling Issue
+```{r}
+mapp_bl_2 %>% 
+  select(pain_severity) %>% 
+  group_by(pain_severity) %>% 
+  mutate(row = sum(n())) %>% 
+  distinct(.keep_all = FALSE) %>% 
+  arrange(desc(row))
+```
+
+#Checking x axis range vs filtering
+```{r}
+mapp_bl_2 %>% 
+  select(pain_severity, cohorttype) %>% 
+  filter(cohorttype == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(pain_severity), binwidth = 1, fill = "light blue", color = "black") +
+  scale_x_continuous(limits = c(0, 25), breaks = seq(-1, 26, by = 2)) +
+  theme_bw()
+```
+
+#Multiple Filters
+```{r}
+b <- 15
+c <- 10
+
+b <- as.integer(b)
+c <- as.integer(c)
+
+class(b)
+class(c)
+
+cohort_types <- c("1 - UCPPS")
+
+data <- mapp_bl_2 %>% 
+  select(urinary_severity, cohorttype2) %>% 
+  filter(cohorttype2 %in% cohort_types & urinary_severity >= c & urinary_severity <= b)
+
+nrow(data)
+
+mapp_bl_2 %>% 
+  filter(cohorttype2 %in% cohort_types) %>% 
+  mutate(pain_severity = as.factor(ifelse(pain_severity < 5, "0", "1"))) %>% 
+  select(pain_severity)
+```
+
+#geom_mosaic
+```{r}
+mapp_bl_labels %>% 
+  select(agegrp, sex) %>% 
+  ggplot() +
+  geom_mosaic(aes(x = product(agegrp, sex), fill = sex))
+
+mapp_bl_labels %>% 
+  select(agegrp, sex) %>% 
+  ggplot() +
+  geom_mosaic(aes(x = product(agegrp), fill = sex)) +
+  coord_flip()
+
+mapp_bl_labels %>% 
+  select(cohorttype, auasi_q1) %>% 
+  ggplot() +
+  geom_mosaic(aes(x = product(auasi_q1), fill = cohorttype)) +
+  theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"), plot.subtitle = element_text(hjust = 0.5, face = "italic", size = 16), legend.position = "bottom", 
+      legend.text = element_text(size = 16), legend.title = element_text(size = 16), axis.text = element_text(size = 12), 
+      axis.text.x = element_text(hjust = 0.5, vjust = 0.25)) +
+  coord_flip()
+```
+
+#geom_bar reference line example
+```{r}
+mapp_bl_2 %>% 
+  select(pain_severity) %>% 
+  mutate(pain_severity = as.factor(ifelse(pain_severity > 10, 1, 0))) %>% 
+  drop_na() %>% 
+  ggplot(aes(pain_severity, fill = pain_severity)) +
+   geom_bar()
+
+x <- 2
+y <- 5
+
+new_x <- "pain_severity"
+new_y <- "urinary_severity"
+
+jjx <- mapp_bl_2 %>%
+  filter(cohorttype2 == "1 - UCPPS") %>% 
+  select(new_x)
+
+jjy <- mapp_bl_2 %>% 
+  filter(cohorttype2 == "1 - UCPPS") %>% 
+  select(new_y)
+
+jjj <- mapp_bl_2 %>% 
+  filter(cohorttype2 == "1 - UCPPS") %>% 
+  mutate(final_x = as.factor(ifelse(jjx < x, 0, 1)), final_y = as.factor(ifelse(jjy < y, 0, 1))) %>% 
+  select(final_x, final_y) %>% 
+  rename({{new_x}} := final_x, {{new_y}} := final_y)
+
+jjj %>%
+ tbl_summary(
+   by = new_x,
+   missing = "ifany",
+   type = all_categorical() ~ "categorical",
+    statistic = all_categorical() ~ "{n} ({p}%)",
+    digits = all_categorical() ~ c(0,1),
+    missing_text = "N missing") %>%
+ modify_spanning_header(all_stat_cols() ~ new_x) %>%
+ modify_header(label ~ "**Variable**") %>%
+ modify_caption(paste("Summary Statistics ~ ", new_x, "and ", new_y)) %>%
+ as_gt()
+```
+
+#Trying regression line
+```{r}
+aa <- "pain_severity"
+bb <- "urinary_severity"
+
+xx <- mapp_bl_2 %>% 
+  select(aa)
+xx <- as.vector(xx[,1])
+
+yy <- mapp_bl_2 %>% 
+  select(bb)
+yy <- as.vector(yy[,1])
+
+model1 <- summary(lm(xx ~ yy))
+model_coef <- summary(lm(urinary_severity ~ pain_severity, mapp_bl_2))$coefficients
+cor_value <- round(sqrt(model1$r.squared), 2)
+slope <- round(model_coef[2,1], 2)
+intercept <- round(model_coef[1,1], 2)
+
+annotation <- data.frame(
+   x = c(min(mapp_bl_2$pain_severity, na.rm = TRUE) - 1, min(mapp_bl_2$pain_severity, na.rm = TRUE) - 1, min(mapp_bl_2$pain_severity, na.rm = TRUE) - 1),
+   y = c(max(mapp_bl_2$urinary_severity, na.rm = TRUE) + 1, max(mapp_bl_2$urinary_severity, na.rm = TRUE) + 1, max(mapp_bl_2$urinary_severity, na.rm = TRUE) + 1),
+   label = c(paste0("r = ", cor_value), paste0("slope = ", slope), paste0("intercept = ", intercept)))
+
+ggplot(mapp_bl_2, aes(pain_severity, urinary_severity)) +
+  geom_count() +
+  geom_label_repel(data = annotation, aes(x = x, y = y, label = label), color = "black", size = 2.25, angle = 0, fontface = "bold", segment.color = 'transparent') +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  geom_smooth(se = FALSE) +
+  theme_bw()
+
+mapp_bl_2x <- mapp_bl_2 %>% 
+  filter(cohorttype == 1 & sex == "Female")
+
+modelx <- lm(urinary_severity ~ pain_severity, data = mapp_bl_2x)
+summary(modelx)
+
+cor.test(mapp_bl_2x$hadsanxtot, mapp_bl_2x$pain_severity)
+```
+#summary_e missing data and filtering observations
+```{r}
+x <- "urinary_severity"
+y <- "auasi_q2"
+
+filtered_data_ex <- mapp_bl_combined %>% 
+  filter(cohorttype2 == "1 - UCPPS") %>% 
+  dplyr::select(x, y)
+
+filtered_data_ex %>%
+      tbl_summary(
+        by = y,
+        missing = "always",
+        type = all_continuous() ~ "continuous2",
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{N_miss}",
+                                         "{median} ({p25}, {p75})",
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0,0,0,0,0,0,0,1,1)) %>%
+      modify_spanning_header(all_stat_cols() ~ y) %>% 
+      modify_caption("Subgroup Summary Table") %>%
+      as_gt()
+
+boop <- 0:30
+sexy <- c("Male", "Female")
+ucpps <- "1 - UCPPS"
+
+filtered_data_ex2 <- mapp_bl_combined[mapp_bl_combined["urinary_severity"] >= min(boop) & mapp_bl_combined["urinary_severity"] <= max(boop) &
+                  (mapp_bl_combined$cohorttype2 %in% ucpps) &
+                  (mapp_bl_combined$sex %in% sexy),] %>% 
+  dplyr::select(x, y)
+
+# pp <- mapp_bl_combined %>% 
+#   filter(cohorttype2 %in% ucpps & sex %in% sexy) %>% 
+#   dplyr::select(x, y)
+# 
+# ppx <- pp %>% 
+#   dplyr::select(x)
+# 
+# pp2 <- filter(ppx >= min(boop) & ppx <= max(boop))
+#   
+# 
+# pp2 %>%
+#       tbl_summary(
+#         by = y,
+#         missing = "ifany",
+#         type = all_continuous() ~ "continuous2",
+#         statistic = all_continuous() ~ c("{N_nonmiss}",
+#                                          "{N_miss}",
+#                                          "{median} ({p25}, {p75})",
+#                                          "{min}, {max}",
+#                                          "{mean} ({sd})"),
+#         digits = all_continuous() ~ c(0,0,0,0,0,0,0,1,1)) %>%
+#       modify_spanning_header(all_stat_cols() ~ y) %>% 
+#       modify_caption("Subgroup Summary Table") %>%
+#       as_gt()
+# 
+# filtered_data_ex
+# filtered_data_ex2
+```
+
+#Different regression lines to account for continuous slider inputs and filtering by a 3rd variable
+```{r}
+reg_ex_m <- mapp_bl_2 %>% 
+  select(urinary_severity, pain_severity, sex, cohorttype) %>% 
+  filter(sex == "Male" & cohorttype == 1)
+
+reg_ex_f <- mapp_bl_2 %>% 
+  select(urinary_severity, pain_severity, sex, cohorttype) %>% 
+  filter(sex == "Female" & cohorttype == 1)
+
+reg_ex <- mapp_bl_2 %>% 
+  select(urinary_severity, pain_severity, cohorttype) %>% 
+  filter(cohorttype == 1)
+
+reg_ex <- reg_ex %>% 
+  filter(pain_severity <= 15 & urinary_severity <= 10)
+
+summary(lm(pain_severity ~ urinary_severity, data = reg_ex))
+```
+#Working to achieve subgroup filtering by updating radio buttons through variable manipulation
+```{r}
+bb <- mapp_bl_combined %>%
+    gather(columnNames, values) %>% 
+    group_by(columnNames) %>% 
+    distinct(.keep_all = TRUE) %>% 
+    drop_na()
+
+x <- "agegrp"
+xy <- "1 - UCPPS"
+yy <- "1: <35 years"
+      
+mapp_bl_combined %>%
+  filter(cohorttype2 %in% xy & x %in% yy)
+
+gg <- mapp_bl_combined %>% 
+  pull(x)
+
+mapp_bl_combined %>% 
+  select(urinary_severity, pain_severity)
+
+mapp_bl_combined %>%
+      select(cohorttype) %>% 
+      gather(columnNames, values) %>% 
+      distinct(.keep_all = TRUE) %>% 
+      pull(values)
+```
+
+**MAPP II Baseline**
+
+#Dictionary
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_dict_II <- read.csv("variable_dict_II.csv") %>% 
+  select(1:11)
+```
+
+#Variable Assignments 3, 4, 5
+```{r}
+variable_assignments_3_II <- mapp_dict_II %>% 
+  slice(1:910) %>% 
+  mutate(variable = as.character(NAME), variable_selection = as.character(Primary_Grouping), label = as.character(LABEL)) %>% 
+  mutate(ANALYSIS_TYPE_2 = ifelse(ANALYSIS_TYPE == 1, "1 - Continuous", ifelse(ANALYSIS_TYPE == 2, "2 - Ordinal", ifelse(ANALYSIS_TYPE == 3, "3 - Nominal", "4 - Binary")))) %>% 
+  select(variable, variable_selection, ANALYSIS_TYPE, ANALYSIS_TYPE_2, label) %>% 
+  filter(variable != "pid" & variable != "zip_first3")
+```
+
+#MAPP BL 2 II
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_bl_2_II <- read.csv("mapp_bl_2_II.csv") %>%
+  mutate(cohorttype2 = ifelse(cohorttype == 1, "1 - UCPPS", ifelse(cohorttype == 2, "2 - Healthy Controls", "3 - Positive Controls")), sex = ifelse(sex == 1, "Male", "Female")) %>% 
+  select(-pid)
+
+mapp_bl_cohort_II <- mapp_bl_2_II %>% 
+  select(cohorttype2) %>% 
+  distinct(cohorttype2, .keep_all = TRUE)
+
+mapp_bl_sex_II <- mapp_bl_2_II %>% 
+  select(sex) %>% 
+  distinct(sex, .keep_all = TRUE)
+
+mapp_bl_primary_II <- variable_assignments_3_II %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#MAPP Labels
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_bl_labels_II <- read.csv("mapp_bl_label_II.csv") %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")),
+         sex = ifelse(sex == "1: Male", "Male", "Female"), bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat)) %>%
+  select(-pid)
+mapp_bl_labels_II[mapp_bl_labels_II == ""] <- NA
+
+variable_assignments_4_II <- variable_assignments_3_II %>% 
+  filter(ANALYSIS_TYPE != 1 & variable != "pid")
+
+variable_assignments_5_II <- variable_assignments_3_II %>% 
+  filter(ANALYSIS_TYPE == 1 & variable != "pid")
+
+factored_II <- mapp_bl_labels_II %>%
+  select(any_of(variable_assignments_4_II$variable)) %>%
+  mutate_if(is.numeric, as.factor)
+
+continuous_II <- mapp_bl_2_II %>%
+  select(any_of(variable_assignments_5_II$variable))
+
+mapp_bl_combined_II <- data.frame(factored_II, continuous_II) %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Controls", "2 - Healthy Controls", "3 - Positive Controls")),
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat))
+
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+full_labels_II <- read_csv("full_labels_II.csv") %>% 
+  drop_na()
+```
+
+#Plots with missing values
+```{r}
+mapp_bl_2_example <- mapp_bl_combined %>%
+  filter(cohorttype == "1: UCPPS") %>% 
+  select(urinary_severity, auasi_q3) %>% 
+  drop_na(urinary_severity) %>% 
+  mutate_if(is.factor, fct_explicit_na, na_level = "Missing Observation")
+
+mapp_bl_2_example_2 <- mapp_bl_combined %>%
+  filter(cohorttype == "1: UCPPS") %>% 
+  select(urinary_severity, auasi_q3) %>% 
+  drop_na()
+
+ggplot(mapp_bl_2_example, aes(urinary_severity, color = auasi_q2, fill = auasi_q2)) + 
+      geom_histogram(binwidth = 1, position = "stack", alpha = 0.5) +
+      scale_x_continuous(limits = c(-1, 26), breaks = seq(0, 25, by = 2)) +
+      theme_bw() +
+      labs(x = "", y = "Count", fill = str_wrap(y, 25), color = str_wrap(y, 25), title = str_wrap(x, 70), 
+           subtitle = paste("Number of Observations: ", nrow(mapp_bl_2_example))) +
+      theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"), plot.subtitle = element_text(hjust = 0.5, face = "italic", size = 16), 
+            axis.title = element_text(size = 16, face = "bold"), legend.position = "bottom", axis.text = element_text(size = 18), legend.text = element_text(size = 16), 
+            legend.title = element_text(size = 16), plot.caption = element_text(hjust = 0, size = 14, face = "bold"))
+
+ggplot(mapp_bl_2_example_2, aes(urinary_severity, color = auasi_q2, fill = auasi_q2)) + 
+      geom_histogram(binwidth = 1, position = "stack", alpha = 0.5) +
+      scale_x_continuous(limits = c(-1, 26), breaks = seq(0, 25, by = 2)) +
+      theme_bw() +
+      labs(x = "", y = "Count", fill = str_wrap(y, 25), color = str_wrap(y, 25), title = str_wrap(x, 70), 
+           subtitle = paste("Number of Observations: ", nrow(mapp_bl_2_example_2))) +
+      theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"), plot.subtitle = element_text(hjust = 0.5, face = "italic", size = 16), 
+            axis.title = element_text(size = 16, face = "bold"), legend.position = "bottom", axis.text = element_text(size = 18), legend.text = element_text(size = 16), 
+            legend.title = element_text(size = 16), plot.caption = element_text(hjust = 0, size = 14, face = "bold"))
+```
+
+#Testing summaries
+```{r}
+mapp_bl_2_example %>%
+      tbl_summary(
+        by = auasi_q3,
+        missing = "ifany",
+        missing_text = "Missing Observations",
+        type = all_continuous() ~ "continuous2",
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})",
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0,0,0,0,0,0,0,1,1)) %>%
+      modify_spanning_header(all_stat_cols() ~ paste("auasi_q2")) %>% 
+      modify_header(label ~ paste("urinary_severity")) %>% 
+      modify_caption("Subgroup Summary Table") %>%
+      as_gt()
+
+mapp_bl_2_example_2 %>%
+      tbl_summary(
+        by = auasi_q3,
+        missing = "ifany",
+        missing_text = "Missing Observations",
+        type = all_continuous() ~ "continuous2",
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})",
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0,0,0,0,0,0,0,1,1)) %>%
+      modify_spanning_header(all_stat_cols() ~ paste("auasi_q2")) %>% 
+      modify_header(label ~ paste("urinary_severity")) %>% 
+      modify_caption("Subgroup Summary Table") %>%
+      as_gt()
+```
+
+#Merging tables
+```{r}
+mapp_ex <- mapp_bl_combined %>%
+  filter(cohorttype == "1: UCPPS")
+
+q1 <- mapp_ex %>% 
+        select(urinary_severity) %>% 
+        tbl_summary(
+          missing = "ifany",
+          missing_text = "Missing Observations",
+          type = all_continuous() ~ "continuous2",
+          statistic = all_continuous() ~ c("{N_nonmiss}",
+                                           "{median} ({p25}, {p75})", 
+                                           "{min}, {max}",
+                                           "{mean} ({sd})"),
+          digits = all_continuous() ~ c(0,0,0,0,0,0,1,1)) %>% 
+        modify_spanning_header(all_stat_cols() ~ "**Summary Statistics**") %>% 
+        modify_header(label ~ "**Variable**") %>%
+        modify_caption(paste("Summary Statistics"))
+      
+q2 <- mapp_ex %>% 
+  select(pain_severity) %>% 
+  tbl_summary(
+          missing = "ifany",
+          missing_text = "Missing Observations",
+          type = all_continuous() ~ "continuous2",
+          statistic = all_continuous() ~ c("{N_nonmiss}",
+                                           "{median} ({p25}, {p75})", 
+                                           "{min}, {max}",
+                                           "{mean} ({sd})"),
+          digits = all_continuous() ~ c(0,0,0,0,0,0,1,1)) %>% 
+        modify_spanning_header(all_stat_cols() ~ "**Summary Statistics**") %>% 
+        modify_header(label ~ "**Variable**") %>%
+        modify_caption("Summary Statistics")
+      
+tbl_merge(tbls = list(q1, q2)) %>%
+  modify_spanning_header(everything() ~ NA_character_) %>% 
+  modify_footnote(all_stat_cols() ~ paste("cohort_label_2()", " | ", "filter_label_2()", "|", "dataset_subtitle_II()")) %>% 
+  as_gt()
+```
+
+#Creating dataframe for the for loop
+```{r}
+cohort_type <- "1 - UCPPS"
+subgroup_options <- c("2: Less than half the time", "4: More than half the time")
+
+hi <- mapp_bl_combined[(mapp_bl_combined$cohorttype2 %in% cohort_type),] %>% 
+     select(pain_severity, auasi_q1)
+
+`%notin%` <- Negate(`%in%`)
+
+jj <- factored %>% 
+  select(auasi_q1) %>% 
+  distinct() %>% 
+  gather(columnNames, values) %>% 
+  mutate(stat_count = substr(values, 1, 1)) %>% 
+  select(stat_count) %>% 
+  drop_na()
+
+oo <- if(0 %notin% jj$stat_count) {
+  factored %>% 
+  select(auasi_q1) %>% 
+  distinct() %>% 
+  gather(columnNames, values) %>% 
+  mutate(stat_count = substr(values, 1, 1)) %>% 
+  filter(values %notin% subgroup_options) %>% 
+  select(stat_count) %>% 
+  drop_na()
+
+} else {
+  factored %>% 
+  select(auasi_q1) %>% 
+  distinct() %>% 
+  gather(columnNames, values) %>% 
+  mutate(stat_count = substr(values, 1, 1)) %>% 
+  filter(values %notin% subgroup_options) %>% 
+  select(stat_count) %>% 
+  drop_na() %>% 
+  mutate(stat_count = as.integer(stat_count) + 1)
+}
+```
+
+#Testing if for loop for summary works
+```{r}
+ww <- NULL
+for (i in nrow(oo)) {
+  ww <- paste0("stat_", oo$stat_count)
+}
+
+if(ww == "stat_") {
+  hi %>% 
+      tbl_summary(
+        by = auasi_q1,
+        missing = "ifany",
+        missing_text = "Missing Observations",
+        type = all_continuous() ~ "continuous2",
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})", 
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0,2,2,2,0,0,2,2)) %>% 
+      modify_spanning_header(all_stat_cols() ~ "**Summary Statistics**") %>%
+      modify_header(label ~ "paste(x)") %>%
+      modify_caption("Summary Table") %>%
+      modify_footnote(all_stat_cols() ~ "Hi") %>%
+      as_gt()
+  
+} else {
+  hi %>% 
+      tbl_summary(
+        by = auasi_q1,
+        missing = "ifany",
+        missing_text = "Missing Observations",
+        type = all_continuous() ~ "continuous2",
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})", 
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0,2,2,2,0,0,2,2)) %>% 
+      modify_spanning_header(all_stat_cols() ~ "**Summary Statistics**") %>%
+      modify_header(label ~ "paste(x)") %>%
+      modify_caption("Summary Table") %>%
+      modify_footnote(all_stat_cols() ~ "Hi") %>%
+      modify_column_hide(columns = all_of(ww)) %>% 
+      as_gt()
+}
+```
+
+#Fixing healthy controls summary bug
+```{r}
+mapp_bl_combined %>% 
+  select(gupiscoreqol, cohorttype2, race_aa) %>% 
+  filter(cohorttype2 == "2 - Healthy Controls") %>% 
+  drop_na(gupiscoreqol, race_aa) %>% 
+      tbl_summary(
+        by = race_aa,
+        missing = "ifany",
+        missing_text = "Missing Observations",
+        type = list(where(is.numeric) ~ "continuous2"),
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})",
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0, 2, 2, 2, 0, 0, 2, 2)) %>%
+      modify_spanning_header(all_stat_cols() ~ "paste(y)") %>% 
+      modify_header(label ~ "paste(x)") %>% 
+      modify_caption("Subgroup Summary Table") %>%
+      modify_footnote(all_stat_cols() ~ "Hi") %>% 
+      add_p(pvalue_fun = ~style_pvalue(.x, digits = 3))
+
+pp <- mapp_bl_combined %>% 
+  select(gupiscoreqol, cohorttype2, race_aa) %>% 
+  filter(cohorttype2 == "2 - Healthy Controls") %>% 
+  select(gupiscoreqol) %>% 
+  mutate(gupiscoreqol = as.numeric(gupiscoreqol))
+```
+
+#Testing Regression
+```{r}
+reg_a <- lm(pain_severity ~ urinary_severity, mapp_bl_combined)
+    
+    reg_a %>% 
+      tbl_regression(
+        pvalue_fun = ~style_pvalue(.x, digits = 3),
+        intercept = TRUE
+      ) %>% 
+      bold_labels() %>% 
+      modify_footnote(all_stat_cols() ~ paste("Response Variable ~", "pain_severity")) %>% 
+      as_gt()
+    
+pp <- mapp_bl_combined %>% 
+  pull(pain_severity)
+
+qq <- mapp_bl_combined %>% 
+  pull(urinary_severity)
+
+lm(pp ~ qq, mapp_bl_combined)
+```
+
+#Longitudinal Graphs
+```{r}
+mapp_long_combined %>% 
+  ggplot(aes(vnum, pain_severity, group = pid)) +
+  geom_line() +
+  facet_wrap(. ~ sex)
+
+mapp_long_combined %>% 
+ ggplot(aes(vnum, pain_severity, group = pid, color = sex)) + 
+  geom_line() +
+  facet_wrap(. ~ auasi_q1) +
+  theme(legend.position = "none")
+```
+
+#Testing Longitudinal Datasets
+```{r}
+mapp_long_combined %>%
+      gather(columnNames, values) %>% 
+      group_by(columnNames) %>% 
+      distinct(.keep_all = TRUE) %>% 
+      drop_na()
+```
+
+#More long plots
+```{r}
+mapp_long_combined %>% 
+  select(vnum, pain_severity, rice_bps_bin) %>% 
+  drop_na(rice_bps_bin) %>% 
+  ggplot(aes(as.factor(vnum), pain_severity, color = rice_bps_bin)) +
+  geom_violin(trim = FALSE, na.rm = TRUE) +
+  stat_summary(fun.data = "mean_sdl", fun.args = list(mult = 1), geom = "pointrange", color = "black") +
+  theme_bw() +
+  facet_wrap(. ~ rice_bps_bin) +
+  theme(legend.position = "none")
+
+mapp_long_combined %>% 
+  ggplot(aes(vnum, age, group = pid)) +
+  geom_line(color = "gray", alpha = 0.7) + 
+  stat_smooth(aes(group = 1), se = FALSE) +
+  stat_summary(aes(group = 1), geom = "point", fun = mean, shape = 16, size = 2, color = "black")
+
+mapp_long_combined %>% 
+  ggplot(aes(vnum, auasi_total, group = pid)) +
+  geom_line() +
+  geom_line(color = "gray", alpha = 0.7) + 
+  stat_smooth(aes(group = 1), se = FALSE, method = lowess) +
+  stat_summary(aes(group = 1), geom = "point", fun = mean, shape = 16, size = 2, color = "black") +
+  stat_summary(aes(group = 1), geom = "point", fun = median, shape = 8, size = 2, color = "black") +
+  theme_bw()
+
+mapp_long_combined %>% 
+  ggplot(aes(vnum, pain_severity, group = pid)) +
+  geom_line(color = "gray", alpha = 0.4) + 
+  facet_wrap(. ~ rice_subtype_3lev) +
+  stat_smooth(aes(group = 1), se = FALSE) +
+  stat_summary(aes(group = 1), geom = "point", fun = median, shape = 8, size = 1, color = "black") +
+  stat_summary(aes(group = 1), geom = "line", fun = median, color = "black", size = 0.2) +
+  theme_bw()
+```
+
+#Longitudinal Tables
+```{r}
+mapp_long_combined %>% 
+  filter(vnum <= 5) %>% 
+  mutate(vnum = as.factor(vnum)) %>% 
+  select(pain_severity, vnum) %>% 
+  tbl_summary(
+    by = vnum,
+    missing = "ifany",
+    missing_text = "Missing Observations",
+    type = list(where(is.numeric) ~ "continuous2"),
+    statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})", 
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+    digits = all_continuous() ~ c(0, 2, 2, 2, 0, 0, 2, 2)
+  )
+```
+
+#Multiple GGPlot Choices
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+ss = TRUE
+if(ss == TRUE) {
+  ggplot2::ggplot(data = iris)
+} else {
+  ggplot2::ggplot(data = iris) + aes(Sepal.Length, Sepal.Width)
+}
+
+p = ggplot2::ggplot(data = iris)
+
+fun1 = function(x, ss) {
+  if(ss == TRUE) {
+    x
+  } else {
+    x + aes(Sepal.Length, Sepal.Width)
+  }
+}
+
+p %>% 
+  fun1(., ss = FALSE) + 
+  geom_line()
+```
+
+#Playing with continuous variables
+```{r}
+variable_assignments_long_5 %>% 
+  distinct(variable_selection) %>% 
+  arrange(variable_selection)
+  
+mapp_long_combined %>% 
+  filter(agegrp)
+  select(age, vnum) %>% 
+  drop_na()
+
+test <- "Demographics/Anthropometrics"
+sort(variable_assignments_long_5[variable_assignments_long_5$variable_selection %in% test, "variable", drop = TRUE])
+
+w <- mapp_long %>% 
+      pull(vnum)
+    
+    max_v <- round(round(max(w, na.rm = TRUE)))
+    min_v <- floor(floor(min(w, na.rm = TRUE)))
+    
+mapp_long_combined %>% 
+  filter(sex == c(5, 4)) %>% 
+  select(vnum)
+```
+
+#gt_summary slider into categorical variable issue
+```{r}
+filtered_data_2a() %>% 
+      select(input$variable_choice) %>% 
+      tbl_summary(
+        missing = "ifany",
+        missing_text = "Missing Observations",
+        type = all_continuous() ~ "continuous2",
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})", 
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0, 2, 2, 2, 0, 0, 2, 2))
+
+mapp_bl_combined %>% 
+  select(pain_severity, cohorttype) %>% 
+  filter(pain_severity < 8, cohorttype == "1: UCPPS") %>% 
+  select(pain_severity) %>% 
+  tbl_summary(
+    missing = "ifany",
+        missing_text = "Missing Observations",
+        type = list(where(is.numeric) ~ "continuous2"),
+        statistic = all_continuous() ~ c("{N_nonmiss}",
+                                         "{median} ({p25}, {p75})", 
+                                         "{min}, {max}",
+                                         "{mean} ({sd})"),
+        digits = all_continuous() ~ c(0, 2, 2, 2, 0, 0, 2, 2))
+```
+
+

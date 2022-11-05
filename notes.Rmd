@@ -1,0 +1,142 @@
+---
+title: "Notes"
+author: "Flynn McMorrow"
+date: '2022-03-02'
+output: html_document
+---
+
+#2-Variable Visualization:
+
+#NOW:
+-Warning message when p-value cannot be calculated
+-Finish summary_c
+-Tab names
+
+-More descriptive labels?
+-Time variables in neuro MAPP II & days since last menstrual cycle/Days since or days of variables in general
+
+-N = value in 2 variable summary for 2 continuous variables
+-Fix download plot loading last_plot() issue
+-Add means to everything using geom_point technique in https://ggplot2-book.org/facet.html
+
+-Fill variable with regression lines and color plot
+-Fading data and coloring selected group for 2 variable
+-Adding facet_wrap to 2 variable
+-Formatting
+  -Clean up side panel items depending on tab selection
+  -Display type should not show up for summaries
+  -Filter observation two way table and summary for continuous variables when using slider
+  
+-Style tbl_regression (Naming the variables instead of xx and intercept)
+-Check tbl_regression accuracy
+-Fix tbl_regression
+-Print an error when the same variable is selected for regression
+  
+-Longitudinal data panel
+    -Stacked bar chart for categorical data
+    -Fix error message "Must request at least one colour from a hue palette" when a visit doesn't have any data points for that variable (auasi_q1 visit 16, etc...) for 1 variable long
+    -Violin plot
+
+-Make a table 1 like in lab 2
+-Occasional downlaod table/download plot mix up
+-Two way table using !!sym()
+
+-Fix download table using new gt table features
+-Add a lowess line for different grouping in longitudinal
+-Look at MAPP Dataview on different machines
+
+#FUTURE:
+-Infinite amount of visualizations options added for the user (Constant updates)
+  -Facet wrap in baseline data combined with colors https://ggplot2-book.org/facet.html
+  -More plots?
+  -User bin width?
+  -Custom color palette longitudinal data
+-Warnings
+
+#DONE:
+-req()
+-Fix missing data drop_na()
+  -Observation data set using something for drop_na() in base R
+-Number of observations for graph_2 when using slider bar
+
+-Finished filtering by an extra variable for both 1 and 2 variable
+-Add a fill variable for two variable to color by sex, etc...
+
+-Naming of extra filter
+-Got rid of ctes_q13A
+-Added validate to get rid of temporarily empty graphs and error message of 0 rows in data
+-Figure out server side error for binary variables/authorization error (ANSWER: dplyr::select in missing data for filtered_data_7)
+-Refresh after hitting extra filter button
+-ggplot footnotes based on subgroup and filtering for 1 and 2 variable
+
+-Wrap caption text
+-Wrap title text
+-Fixed bpi_region_notpp_cat label
+
+-Fixed COPC
+-Added a refresh when switching between data
+-Added categorical variables for MAPP II
+
+-MAPP II integrated into 2 variable viz
+-Fixed continuous vs continuous and categorical vs continuous
+-Added current working dataset to subtitle
+-1 variable binary summaries
+-Turning . or empty spaces into NA values
+-Missing data for categorical variables fixed
+
+-Fixed RICE not showing up
+-Fixed missing observations in all of 1 variable viz
+-Missing data for continuous variables/missing data in continuous summaries
+-Continuous variable subtitle number of rows
+-Added new variable additions to MAPP I & II baseline
+-Fill variable not working
+-Make missing data button absent for continuous vs continuous, but show up when fill variable is selected
+-Fill selection stays up when swapping between datasets/variables
+-Axis spacing in 2 variable viz
+
+-Fixed . = 0 inf column in summaries
+-Added download for plots
+-Fixed download plot sizing
+-Attached strata radio buttons to the strata data
+-Add subgroup radio buttons to fill variable
+
+-PDF to png
+-Round digits & add p-values to tables with "by" for 1 and 2 variable viz
+-Made tables downloadable & add more download buttons for 1 and 2 variable viz
+-Working on getting rid of missing columns
+
+-Fixed UI errors and the column total errors
+-Missing observations for two way table
+-Fixed medtypecat and copc variables messed up by the date/time in excel
+-Ask how to deal with the time variables in MAPP II
+-Toggle between PDF/PNG for plots
+
+-Fixed the weird summary interaction with healthy controls
+-Summary makes column disappear when stratified options are selected/deselected
+-Implement tbl_regression
+
+-Expanded column_hide
+-Digits in tbl_regression cannot be fixed, sig figs issue
+-Same x and y variable summary table issue fixed
+-Make fill variable legend bigger
+-Fixed column hide when subgroup variable had a group 0
+-MAPP II two way table when x and y are same variable/Match.arg error
+-Made the fill legend title the variable description
+
+-1 and 2 variable viz now have longitudinal data by visits
+-Loaded in Dina's new lowercase variable names for MAPP I Baseline
+
+-Longitudinal data panel
+  -Combination of graphical features
+    -Spaghetti plots
+      -Facet_wrap graphs
+      -Graph of means, can be facet_wrapped
+      -Lowess line, can be facet_wrapped
+      
+-Dynamic height for facet_wrap
+-Fixed x and y slider appearing for two way table
+-Summary names
+-Optimized summary_a
+-Adding summary_c
+-Got rid of the arrows in text boxes
+

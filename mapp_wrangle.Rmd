@@ -1,0 +1,361 @@
+---
+title: "Shiny_Wrangle"
+author: "Flynn McMorrow"
+date: "7/20/2021"
+output: html_document
+---
+
+#Library and Working Directory
+```{r}
+library(shiny)
+library(DT)
+library(shinydashboard)
+library(magrittr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(naniar)
+library(gtsummary)
+library(gt)
+library(webshot2)
+library(cowplot)
+library(colourpicker)
+library(stringr)
+library(ggmosaic)
+library(shinyvalidate)
+library(ggpubr)
+library(ggrepel)
+library(forcats)
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+```
+
+#Primary Groups
+```{r}
+display_type <- c("Count", "Percent")
+
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+
+missing_data <- c("Yes", "No")
+
+caption <- c("No", "Yes")
+
+dataset_choice <- c("MAPP I Baseline", "MAPP II Baseline", "MAPP I Longitudinal", "MAPP II Longitudinal")
+dataset_choice_long <- c("MAPP I Longitudinal", "MAPP II Longitudinal")
+dataset_choice_dict <- c("MAPP I Baseline", "MAPP II Baseline", "MAPP I Longitudinal", "MAPP II Longitudinal")
+
+pdf_png <- c(".pdf", ".png")
+```
+
+#MAPP BL 1
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_bl_2 <- read.csv("mapp_bl_2.csv") %>%
+  mutate(cohorttype2 = ifelse(cohorttype == 1, "1 - UCPPS", ifelse(cohorttype == 2, "2 - Healthy Controls", "3 - Positive Controls"))) %>% 
+  select(-pid)
+mapp_bl_2[mapp_bl_2 == "."] <- NA
+mapp_bl_2[mapp_bl_2 == " "] <- NA
+mapp_bl_2[sapply(mapp_bl_2, is.character)] <- lapply(mapp_bl_2[sapply(mapp_bl_2, is.character)], as.factor)
+
+mapp_bl_cohort <- mapp_bl_2 %>% 
+  select(cohorttype2) %>% 
+  distinct(cohorttype2, .keep_all = TRUE)
+```
+
+#Variable Assignment 3
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_dict <- read.csv("variable_dict.csv")
+
+variable_assignments_3 <- mapp_dict %>% 
+  mutate(variable = as.character(NAME), variable_selection = as.character(Primary_Grouping), label = as.character(Label)) %>% 
+  mutate(ANALYSIS_TYPE_2 = ifelse(ANALYSIS_TYPE == 1, "1 - Continuous", ifelse(ANALYSIS_TYPE == 2, "2 - Ordinal", ifelse(ANALYSIS_TYPE == 3, "3 - Nominal", "4 - Binary")))) %>% 
+  select(variable, variable_selection, ANALYSIS_TYPE, ANALYSIS_TYPE_2, label) %>% 
+  filter(variable != "pid" & variable != "zip_first3" & variable != "year_visit")
+
+mapp_bl_primary <- variable_assignments_3 %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#MAPP BL Labels
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+
+mapp_bl_labels <- read.csv("mapp_bl_label.csv") %>% 
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")),  
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat), 
+         copc_sum3_ord3 = ifelse(copc_sum3_ord3 == "0:00", "0: 0", copc_sum3_ord3),
+         copc_sum5_ord3 = ifelse(copc_sum5_ord3 == "0:00", "0: 0", copc_sum5_ord3),
+         across(starts_with("medtype"), ~ ifelse(. == "1:01", "1: 1", .))) %>% 
+  select(-pid)
+
+mapp_bl_labels[mapp_bl_labels == "."] <- NA
+mapp_bl_labels[mapp_bl_labels == " "] <- NA
+mapp_bl_labels[sapply(mapp_bl_labels, is.character)] <- lapply(mapp_bl_labels[sapply(mapp_bl_labels, is.character)], as.factor)
+
+variable_assignments_4 <- variable_assignments_3 %>% 
+  filter(ANALYSIS_TYPE != 1 & variable != "pid")
+
+variable_assignments_5 <- variable_assignments_3 %>% 
+  filter(ANALYSIS_TYPE == 1 & variable != "pid")
+
+factored <- mapp_bl_labels %>% 
+  select(any_of(variable_assignments_4$variable)) %>% 
+  mutate_if(is.numeric, as.factor) %>% 
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")))
+
+continuous <- mapp_bl_2 %>% 
+  select(any_of(variable_assignments_5$variable))
+
+mapp_bl_combined <- data.frame(factored, continuous) %>% 
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")))
+
+mapp_bl_combined[sapply(mapp_bl_combined, is.character)] <- lapply(mapp_bl_combined[sapply(mapp_bl_combined, is.character)], as.factor)
+```
+
+#Full Labels
+```{r}
+full_labels <- mapp_dict %>%
+  select(NAME, Label) %>% 
+  rename(variable_label = Label, variable = NAME)
+```
+
+#**MAPP II Baseline**
+
+#Dictionary
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_dict_II <- read.csv("variable_dict_II.csv") %>% 
+  select(1:11)
+```
+
+#Variable Assignments 3, 4, 5
+```{r}
+variable_assignments_3_II <- mapp_dict_II %>% 
+  mutate(variable = as.character(NAME), variable_selection = as.character(Primary_Grouping), label = as.character(LABEL)) %>% 
+  mutate(ANALYSIS_TYPE_2 = ifelse(ANALYSIS_TYPE == 1, "1 - Continuous", ifelse(ANALYSIS_TYPE == 2, "2 - Ordinal", ifelse(ANALYSIS_TYPE == 3, "3 - Nominal", "4 - Binary")))) %>% 
+  select(variable, variable_selection, ANALYSIS_TYPE, ANALYSIS_TYPE_2, label) %>% 
+  filter(variable != "pid" & variable != "zip_first3" & variable != "year_visit")
+```
+
+#MAPP BL 2 II
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_bl_2_II <- read.csv("mapp_bl_2_II.csv") %>%
+  mutate(cohorttype2 = ifelse(cohorttype == 1, "1 - UCPPS", ifelse(cohorttype == 2, "2 - Healthy Controls", "3 - Positive Controls"))) %>% 
+  select(-pid)
+mapp_bl_2_II[mapp_bl_2_II == "."] <- NA
+mapp_bl_2_II[mapp_bl_2_II == " "] <- NA
+mapp_bl_2_II[sapply(mapp_bl_2_II, is.character)] <- lapply(mapp_bl_2_II[sapply(mapp_bl_2_II, is.character)], as.factor)
+
+mapp_bl_cohort_II <- mapp_bl_2_II %>% 
+  select(cohorttype2) %>% 
+  distinct(cohorttype2, .keep_all = TRUE)
+
+mapp_bl_primary_II <- variable_assignments_3_II %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#MAPP Labels II
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_bl_labels_II <- read.csv("mapp_bl_label_II.csv") %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")),
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat), 
+         copc_sum3_ord3 = ifelse(copc_sum3_ord3 == "0:00", "0: 0", copc_sum3_ord3),
+         copc_sum5_ord3 = ifelse(copc_sum5_ord3 == "0:00", "0: 0", copc_sum5_ord3)) %>%
+  select(-pid)
+
+mapp_bl_labels_II[mapp_bl_labels_II == " "] <- NA
+mapp_bl_labels_II[mapp_bl_labels_II == "."] <- NA
+mapp_bl_labels_II[sapply(mapp_bl_labels_II, is.character)] <- lapply(mapp_bl_labels_II[sapply(mapp_bl_labels_II, is.character)], as.factor)
+
+variable_assignments_4_II <- variable_assignments_3_II %>% 
+  filter(ANALYSIS_TYPE != 1 & variable != "pid")
+
+variable_assignments_5_II <- variable_assignments_3_II %>% 
+  filter(ANALYSIS_TYPE == 1 & variable != "pid")
+
+factored_II <- mapp_bl_labels_II %>%
+  select(any_of(variable_assignments_4_II$variable)) %>%
+  mutate_if(is.numeric, as.factor)
+
+continuous_II <- mapp_bl_2_II %>%
+  select(any_of(variable_assignments_5_II$variable))
+
+mapp_bl_combined_II <- data.frame(factored_II, continuous_II) %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Controls", "2 - Healthy Controls", "3 - Positive Controls")),
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat))
+
+mapp_bl_combined_II[sapply(mapp_bl_combined_II, is.character)] <- lapply(mapp_bl_combined_II[sapply(mapp_bl_combined_II, is.character)], as.factor)
+
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+full_labels_II <- read_csv("full_labels_II.csv") %>% 
+  select(1:2)
+```
+
+#**Longitudinal Data**
+
+#Loading in Longitudinal Data
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_long_labels <- read_csv("formatted_m1longdata_26aug2022.csv", na = ".")
+mapp_long_raw <- read_csv("unformatted_m1longdata_26aug2022.csv", na = "")
+mapp_long_dict <- read_csv("M1 longitudinal data assignments 26aug2022.csv") %>% 
+  rename(variable = NAME, label = LABEL, analysis_type = ANALYSIS_TYPE, variable_selection = Primary_Grouping)
+```
+
+#Cleaning Longitudinal Raw Data
+```{r}
+mapp_long_raw <- mapp_long_raw %>%
+  mutate(cohorttype2 = ifelse(cohorttype == 1, "1 - UCPPS", NA))
+
+mapp_long_cohort <- mapp_long_raw %>% 
+  select(cohorttype2) %>% 
+  distinct(cohorttype2, .keep_all = TRUE)
+```
+
+#Variable Assingment Longitudinal
+```{r}
+variable_assignments_long_3 <- mapp_long_dict %>% 
+  mutate(ANALYSIS_TYPE_2= ifelse(analysis_type == 1, "1 - Continuous", ifelse(analysis_type == 2, "2 - Ordinal", ifelse(analysis_type == 3, "3 - Nominal", "4 - Binary")))) %>% 
+  select(variable, variable_selection, analysis_type, ANALYSIS_TYPE_2, label)
+
+mapp_long_primary <- variable_assignments_long_3 %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#MAPP Long Labels
+```{r}
+mapp_long_labels <- mapp_long_labels %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", NA),
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat),
+         copc_sum3_ord3 = ifelse(copc_sum3_ord3 == "0:00", "0: 0", copc_sum3_ord3),
+         copc_sum5_ord3 = ifelse(copc_sum5_ord3 == "0:00", "0: 0", copc_sum5_ord3),
+         across(starts_with("medtype"), ~ ifelse(. == "1:01", "1: 1", .)),
+         pid = as.factor(pid))
+
+mapp_long_labels[sapply(mapp_long_labels, is.character)] <- lapply(mapp_long_labels[sapply(mapp_long_labels, is.character)], as.factor)
+
+variable_assignments_long_4 <- variable_assignments_long_3 %>%
+  filter(analysis_type != 1)
+
+variable_assignments_long_5 <- variable_assignments_long_3 %>%
+  filter(analysis_type == 1)
+
+factored_long <- mapp_long_labels %>%
+  select(any_of(variable_assignments_long_4$variable)) %>%
+  mutate_if(is.numeric, as.factor)
+
+continuous_long <- mapp_long_raw %>%
+  select(any_of(variable_assignments_long_5$variable))
+
+mapp_long_combined <- data.frame(factored_long, continuous_long) %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")))
+
+mapp_bl_combined[sapply(mapp_bl_combined, is.character)] <- lapply(mapp_bl_combined[sapply(mapp_bl_combined, is.character)], as.factor)
+
+mapp_long_primary_con <- variable_assignments_long_5 %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#Full Labels Long
+```{r}
+full_labels_long <- as.data.frame(mapp_long_dict %>%
+  select(variable, label) %>% 
+  rename(variable_label = label))
+```
+
+#Longitudinal Groups
+```{r}
+mapp_long_primary <- variable_assignments_long_3 %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#**Longitudinal Data II**
+
+#Loading in Longitudinal Data II
+```{r}
+setwd("/Users/flynnmc/Desktop/UPenn/Flynn MAPP Items")
+mapp_long_labels_II <- read_csv("formatted_m1longdata_26aug2022.csv", na = ".")
+mapp_long_raw_II <- read_csv("unformatted_m1longdata_26aug2022.csv", na = "")
+mapp_long_dict_II <- read_csv("M1 longitudinal data assignments 26aug2022.csv") %>% 
+  rename(variable = NAME, label = LABEL, analysis_type = ANALYSIS_TYPE, variable_selection = Primary_Grouping)
+```
+
+#Cleaning Longitudinal Raw Data II
+```{r}
+mapp_long_raw_II <- mapp_long_raw_II %>%
+  mutate(cohorttype2 = ifelse(cohorttype == 1, "1 - UCPPS", NA))
+
+mapp_long_cohort_II <- mapp_long_raw_II %>% 
+  select(cohorttype2) %>% 
+  distinct(cohorttype2, .keep_all = TRUE)
+```
+
+#Variable Assingment Longitudinal II
+```{r}
+variable_assignments_long_3_II <- mapp_long_dict_II %>% 
+  mutate(ANALYSIS_TYPE_2 = ifelse(analysis_type == 1, "1 - Continuous", ifelse(analysis_type == 2, "2 - Ordinal", ifelse(analysis_type == 3, "3 - Nominal", "4 - Binary")))) %>% 
+  select(variable, variable_selection, analysis_type, ANALYSIS_TYPE_2, label)
+
+mapp_long_primary_II <- variable_assignments_long_3_II %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
+
+#MAPP Long Labels II
+```{r}
+mapp_long_labels_II <- mapp_long_labels_II %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", NA),
+         bpi_region_notpp_cat = ifelse(bpi_region_notpp_cat == "0:00", "0: 0", bpi_region_notpp_cat),
+         copc_sum3_ord3 = ifelse(copc_sum3_ord3 == "0:00", "0: 0", copc_sum3_ord3),
+         copc_sum5_ord3 = ifelse(copc_sum5_ord3 == "0:00", "0: 0", copc_sum5_ord3),
+         across(starts_with("medtype"), ~ ifelse(. == "1:01", "1: 1", .)),
+         pid = as.factor(pid))
+
+mapp_long_labels_II[sapply(mapp_long_labels_II, is.character)] <- lapply(mapp_long_labels_II[sapply(mapp_long_labels_II, is.character)], as.factor)
+
+variable_assignments_long_4_II <- variable_assignments_long_3_II %>%
+  filter(analysis_type != 1)
+
+variable_assignments_long_5_II <- variable_assignments_long_3_II %>%
+  filter(analysis_type == 1)
+
+factored_long_II <- mapp_long_labels_II %>%
+  select(any_of(variable_assignments_long_4_II$variable)) %>%
+  mutate_if(is.numeric, as.factor)
+
+continuous_long_II <- mapp_long_raw_II %>%
+  select(any_of(variable_assignments_long_5_II$variable))
+
+mapp_long_combined_II <- data.frame(factored_long_II, continuous_long_II) %>%
+  mutate(cohorttype2 = ifelse(cohorttype == "1: UCPPS", "1 - UCPPS", ifelse(cohorttype == "2: Healthy Controls", "2 - Healthy Controls", "3 - Positive Controls")))
+
+mapp_bl_combined_II[sapply(mapp_bl_combined_II, is.character)] <- lapply(mapp_bl_combined_II[sapply(mapp_bl_combined_II, is.character)], as.factor)
+```
+
+#Full Labels Long II
+```{r}
+full_labels_long_II <- as.data.frame(mapp_long_dict_II) %>%
+  select(variable, label) %>% 
+  rename(variable_label = label)
+```
+
+#Longitudinal Groups II
+```{r}
+mapp_long_primary_II <- variable_assignments_long_3_II %>% 
+  select(variable_selection) %>% 
+  distinct() %>% 
+  arrange(variable_selection)
+```
