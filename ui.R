@@ -1043,7 +1043,7 @@ long_panel <- tabPanel(
   ))
 
 third_panel <- tabPanel(
-  "Data Dictionary",
+  "Data Codebook",
   
   titlePanel("MAPP Data Dictionary"),
   
